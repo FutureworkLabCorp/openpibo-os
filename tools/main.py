@@ -1,4 +1,3 @@
-from fastapi_socketio import SocketManager
 from fastapi import FastAPI,Request,UploadFile,File,Body
 from fastapi.responses import HTMLResponse,FileResponse,JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -11,6 +10,7 @@ import time,os,json,shutil
 from urllib import parse
 import argparse
 import requests
+import socketio
 
 try:
   app = FastAPI()
@@ -18,9 +18,15 @@ try:
   app.mount("/webfonts", StaticFiles(directory="webfonts"), name="webfonts")
   app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
   templates = Jinja2Templates(directory="templates")
-  socketio = SocketManager(app=app, cors_allowed_origins=[])
 except Exception as ex:
   pibo.logger.error(f'Server Error:{ex}')
+
+
+sio = socketio.AsyncServer(async_mode='asgi', cors_allowed_origins=[],)
+sio_app = socketio.ASGIApp(sio, socketio_path='/ws/socket.io',)
+app.mount('/ws', sio_app)
+app.sio = sio
+
 
 # REST API
 @app.get('/', response_class=HTMLResponse)
