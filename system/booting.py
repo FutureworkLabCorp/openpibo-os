@@ -80,9 +80,28 @@ async def f():
 
 @app.get('/wifi')
 async def f():
-  with open('/etc/wpa_supplicant/wpa_supplicant.conf', 'r') as f:
-    tmp = f.readlines()
-  return JSONResponse(content={'result':'ok', 'ssid':tmp[4].split('"')[1], 'psk':tmp[5].split('"')[1] if 'psk' in tmp[5] else "", 'ipaddress':wifi_info[0], 'eth1': wifi_info[2]}, status_code=200)
+  lines = []
+  ssid = ''
+  psk = ''
+
+  if os.path.exists("/etc/wpa_supplicant/wpa_supplicant.conf"):
+    with open('/etc/wpa_supplicant/wpa_supplicant.conf', 'r') as f:
+      lines = f.readlines()
+  else:
+    return JSONResponse(content={'result':'ok', 'ssid':ssid, 'psk':psk, 'ipaddress':wifi_info[0], 'eth1': wifi_info[2]}, status_code=404)
+
+  for line in lines:
+    line = line.strip()
+    if line == '':
+      continue
+
+    if 'ssid' in line:
+      ssid = line.split('=', 1)[1].strip('"')
+    elif 'psk' in line:
+      psk = line.split('=', 1)[1].strip('"')
+      break
+
+  return JSONResponse(content={'result':'ok', 'ssid':ssid, 'psk':psk, 'ipaddress':wifi_info[0], 'eth1': wifi_info[2]}, status_code=200)
 
 @app.post('/wifi')
 async def f(data: dict = Body(...)):
@@ -104,7 +123,7 @@ async def f(data: dict = Body(...)):
   with open('/etc/wpa_supplicant/wpa_supplicant.conf', 'w') as f:
     f.write(tmp)
   os.system('wpa_cli -i wlan0 reconfigure')
-  os.system("shutdown -r now")
+  #os.system("shutdown -r now")
 
 def wifi_update():
   global wifi_info
