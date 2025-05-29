@@ -2411,7 +2411,7 @@ const getSimulations = (socket) => {
 };
 
 $(function () {
-  const socket = io(`http://${location.hostname}`, {
+  const socket = io(`${location.href}`, {
     path: "/ws/socket.io",
   });
 
