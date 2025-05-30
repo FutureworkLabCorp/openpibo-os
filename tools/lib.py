@@ -525,13 +525,16 @@ class Pibo:
     shutil.chown('/home/pi/mymotion.json', 'pi', 'pi')
     return self.motion_j
 
-  def load_motion(self, name):
-    if name in self.motion_j:
-      a = self.motion_j[name]
-    elif name in self.mot.get_motion():
-      a = self.mot.get_motion(name)
+  def load_motion(self, name_or_data):
+    if isinstance(name_or_data, str):
+      if name_or_data in self.motion_j:
+        a = self.motion_j[name_or_data]
+      elif name_or_data in self.mot.get_motion():
+        a = self.mot.get_motion(name_or_data)
+      else:
+        return self.motion_p
     else:
-      return self.motion_p
+      a = name_or_data
 
     self.motion_p = []
     if 'init_def' in a and 'init' in a:
