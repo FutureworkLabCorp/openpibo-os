@@ -12,7 +12,9 @@ AP_MODE_CONFIG_FILE="/etc/default/wifi-ap-sta"
 wifi_country() {
 	local country
 	country=$(wpa_cli -i "$WIFI_IFACE" get country 2>/dev/null)
-	[ "${country}" = "FAIL" ] && country="00"
+	if [ "${country}" = "FAIL" ] && [ -x "$(command -v raspi-config)" ]; then
+		country=$(raspi-config nonint get_wifi_country)
+	fi
 	echo "${country:-00}"
 }
 
@@ -34,9 +36,13 @@ initialise_ap_values() {
 	HOSTAPD_ctrl_interface="${HOSTAPD_ctrl_interface:-/var/run/hostapd}"
 	HOSTAPD_ctrl_interface_group="${HOSTAPD_ctrl_interface_group:-0}"
 	HOSTAPD_hw_mode="${HOSTAPD_hw_mode:-g}"
-	HOSTAPD_channel="${HOSTAPD_channel:-$(($RANDOM% 12+1))}"
-	#HOSTAPD_hw_mode="${HOSTAPD_hw_mode:-a}"
-	#HOSTAPD_channel="${HOSTAPD_channel:-36}"
+	if [ "$HOSTAPD_hw_mode" = "g" ]; then
+		# 2.4GHz
+		HOSTAPD_channel="${HOSTAPD_channel:-$(($RANDOM% 12+1))}"
+	else
+		# 5GHz hw_mode = a
+		HOSTAPD_channel="${HOSTAPD_channel:-36}"
+	fi
 	HOSTAPD_macaddr_acl="${HOSTAPD_macaddr_acl:-0}"
 	HOSTAPD_auth_algs="${HOSTAPD_auth_algs:-1}"
 	HOSTAPD_ignore_broadcast_ssid="${HOSTAPD_ignore_broadcast_ssid:-0}"
@@ -133,9 +139,11 @@ do_disable() {
 
 # Added by yjlee - Start
 do_run() {
+	_create_virtual_interface
+	_wait_for_virtual_interface
 	do_configure_hostapd
 	_start_ap_mode
-	_restart_networking_services
+	#_restart_networking_services
 	_wait_for_virtual_interface_ip_addr
 }
 # Added by yjlee - End
@@ -287,6 +295,31 @@ _patch_config_hostapd_files() {
 	done
 
 	echo -e "interface=${AP_IFACE}\\nssid=${AP_SSID}\\nwpa_passphrase=${AP_PASSWORD}" >>"${hostapd_conf}"
+
+	dhcpd_conf="/etc/dhcp/dhcpd.conf"
+	echo "Setting subnet configuration in ${dhcpd_conf} ..."
+	_configure_file \
+		"${dhcpd_conf}" \
+		"Configuration for wireless access point network" \
+		"subnet ${SUBNET_IP} netmask ${SUBNET_MASK} {
+    range ${STATIC_IP_PREFIX}.${DHCP_RANGE_START} ${STATIC_IP_PREFIX}.${DHCP_RANGE_END};
+    option subnet-mask ${SUBNET_MASK};
+    option routers ${IFACE_IP};
+    option domain-name-servers 8.8.8.8, 8.8.4.4;
+    option time-offset 0;
+    option broadcast-address ${STATIC_IP_PREFIX}.255;
+  }"
+
+	echo "Configuring ${AP_IFACE} in /etc/default/isc-dhcp-server ..."
+	_configure_file \
+		/etc/default/isc-dhcp-server \
+		"Set DHCP server to serve IP addresses on Wireless Access Point interface" \
+		"if [ ! -z \"\${INTERFACESv4:-}\" ]; then
+	INTERFACESv4=\"\${INTERFACESv4} ${AP_IFACE}\"
+else
+	INTERFACESv4=\"${AP_IFACE}\"
+fi"
+
 }
 # Added by yjlee - End
 
@@ -392,9 +425,12 @@ _reload_udev_rules() {
 }
 
 _create_virtual_interface_udev_rule() {
+	# default phy0 but sometime phy1 device
+	phydev=$(iw dev |head -1 |sed 's/#//')
+
 	cat >"${UDEV_RULES_FILE}" <<EOF
-SUBSYSTEM=="ieee80211", ACTION=="add|change", KERNEL=="phy0", \
-RUN+="/sbin/iw phy phy0 interface add ${AP_IFACE} type __ap", \
+SUBSYSTEM=="ieee80211", ACTION=="add|change", KERNEL=="${phydev}", \
+RUN+="/sbin/iw phy ${phydev} interface add ${AP_IFACE} type __ap", \
 RUN+="/bin/ip link set ${AP_IFACE} address ${AP_MAC}"
 EOF
 }
