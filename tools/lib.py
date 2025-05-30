@@ -342,8 +342,16 @@ class Pibo:
     x = d['x']
     y = d['y']
 
+    # getsize method is deprecated
+    if hasattr(self.ole.font, 'getsize'):
+      def getsize(item):
+        return self.ole.font.getsize(item)
+    else:
+      def getsize(item):
+        return self.ole.font.getbbox(item)[2:4]
+
     for item in d['text'].split('\\n'):
-      _, h = self.ole.font.getsize(item)
+      _, h = getsize(item)
       self.ole.draw_text((x, y), item)
       y += h
     self.ole.show()
