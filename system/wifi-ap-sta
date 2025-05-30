@@ -44,6 +44,8 @@ initialise_ap_values() {
 		HOSTAPD_channel="${HOSTAPD_channel:-36}"
 	fi
 	HOSTAPD_macaddr_acl="${HOSTAPD_macaddr_acl:-0}"
+	# warning: `iwconfig' uses wireless extensions which will stop working for Wi-Fi 7 hardware; use nl80211
+	HOSTAPD_driver="${HOSTAPD_driver:-nl80211}"
 	HOSTAPD_auth_algs="${HOSTAPD_auth_algs:-1}"
 	HOSTAPD_ignore_broadcast_ssid="${HOSTAPD_ignore_broadcast_ssid:-0}"
 	HOSTAPD_wpa="${HOSTAPD_wpa:-2}"
@@ -143,6 +145,7 @@ do_run() {
 	_wait_for_virtual_interface
 	do_configure_hostapd
 	_start_ap_mode
+	# Failed to connect to non-global ctrl_ifname: wlan0  error: No such file or directory
 	#_restart_networking_services
 	_wait_for_virtual_interface_ip_addr
 }
