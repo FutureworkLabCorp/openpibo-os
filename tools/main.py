@@ -609,4 +609,4 @@ if __name__ == '__main__':
   args = parser.parse_args()
 
   import uvicorn
-  uvicorn.run('main:app', host='0.0.0.0', port=args.port, access_log=False)
+  uvicorn.run('main:app', host='0.0.0.0', port=int(args.port), access_log=False)
